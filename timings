@@ -1,0 +1,9 @@
+#WITH OMP PARALLEL
+real  12m26.054s
+user  89m29.089s
+sys   2m34.641s
+
+#WITHOUT OMP PARALLEL
+real	 12m53.751s
+user	 96m7.339s
+sys	 3m7.913s
