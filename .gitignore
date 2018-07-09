@@ -38,9 +38,9 @@ config.rst
 /.project
 /.pydevproject
 
-.sh
-.vot
-.tar
-.tar.gz
-.tar.bz2
-.csv
+*.sh
+*.vot
+*.tar
+*.tar.gz
+*.tar.bz2
+*.csv
