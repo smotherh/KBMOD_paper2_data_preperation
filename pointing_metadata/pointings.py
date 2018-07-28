@@ -303,10 +303,7 @@ class PointingGroups:
             raise TypeError(errmsg)
 
     @classmethod
-    def load(cls, **kwargs):
-        try: filepath = kwargs.pop("filepath")
-        except: pass
-        filepath = kwargs.pop("filename")
+    def load(cls, filepath):
         with open(filepath, "rb") as file:
             return pickle.load(file)
 
@@ -335,7 +332,8 @@ class PointingGroups:
         if isinstance(key, str):
             try: return self.table[self.imdiff[key]]
             except: pass
-            return self.table[self.ingest[key]]
+            try: return self.table[self.ingest[key]]
+            except: pass
         elif isinstance(key, int):
             return self.table[self.groups[key]]
         elif isinstance(key, slice):
