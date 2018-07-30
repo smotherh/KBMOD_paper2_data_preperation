@@ -177,11 +177,12 @@ def group_pointings(pointings, raTol=5e-2, deTol=5e-2, minNumVisits=3,
 
         # we will perform the second search only if the group will be kept
         # otherwise we just remove the elements and progress the search to next
-        # group
+        # group, this is sort of a "premature" optimization in the sense that 
+        # once we remove reprocessing duplicates the group can end up smaller
         if removeSmallGroups and len(indice)<minNumVisits:
             tmpCopy.remove_rows(indice)
             continue
-
+             
         raMask = np.isclose(ra,  pointings['ra'],  atol=raTol)
         deMask = np.isclose(dec, pointings['dec'], atol=deTol)
         allindice = np.where(raMask & deMask == True)[0]
@@ -205,6 +206,15 @@ def group_pointings(pointings, raTol=5e-2, deTol=5e-2, minNumVisits=3,
                     else:
                         goodrows.append(row)
 
+        # as stated above, once we clear out duplicates we again check if 
+        # group is removable. We have to be careful of empty "goodrows"
+        # because "indice" does not reset to empty
+        if removeSmallGroups and len(goodrows)<minNumVisits and len(goodrows)>0:
+            #import pdb
+            #pdb.set_trace()
+            tmpCopy.remove_rows(indice)
+            continue
+            
         # the only purpose of group is to maintain the same naming conventions
         # as Hayden so verification is easier. It is otherwise not required.
         ra, dec = group[0]["ra"], group[0]["dec"]
