@@ -364,6 +364,9 @@ class PointingGroups:
             raise StopIteration()
         self._curr += 1
         return self.table[self.groups[self._curr]]
+    
+    def __len__(self):
+        return len(self.groups)
 
     def write(self, filepath):
         with open(filepath, 'wb') as file:
