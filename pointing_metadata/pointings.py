@@ -42,7 +42,7 @@ def create_imdiff_foldername(ra, dec):
 
 
 
-def read_pointings(maxNight=32, keepOnlyImageType=True):
+def read_pointings(filePath="",maxNight=32, keepOnlyImageType=True):
     """Will read VOT metadata tables for series of VOT table filenames given
     in night_{index}.vot format, where index is incremented index from 0 to
     maxNight and stack them into a singular table. 
@@ -65,7 +65,7 @@ def read_pointings(maxNight=32, keepOnlyImageType=True):
     """
     allNights = []
     for i in range(1, maxNight):
-        filename = "night_{0}.vot".format(i)
+        filename = filePath+"night_{0}.vot".format(i)
         votableFile = parse(filename)
         # also the only table availible
         votable = votableFile.get_first_table() 
@@ -75,7 +75,8 @@ def read_pointings(maxNight=32, keepOnlyImageType=True):
                               "instrument", "telescope", "surveyid", "dtpropid",
                               "reference", "filter", "proctype", "obsmode",
                               "obstype"])
-
+        col = astropyTable.Column( [i]*len(table) , name="survey_night")
+        table.add_column(col)
         allNights.append(table)
 
     allNights = astropyTable.vstack(allNights)
@@ -364,9 +365,6 @@ class PointingGroups:
             raise StopIteration()
         self._curr += 1
         return self.table[self.groups[self._curr]]
-    
-    def __len__(self):
-        return len(self.groups)
 
     def write(self, filepath):
         with open(filepath, 'wb') as file:
