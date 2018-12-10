@@ -1,6 +1,7 @@
 import numpy as np
 import pickle
 from astropy.io.votable import parse
+
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from matplotlib.collections import PatchCollection
@@ -118,133 +119,6 @@ def sort_pointings(neo_metadata_df,Ra_Tol=1e-2,Dec_Tol=2e-2,Min_Num_Visits=3):
     Pointing_Groups = Temp_Fields
     return(Pointing_Groups)
 
-def link_instcal_files(Pointing_Groups,NEO_src,catalog_src,dest,script_name='link_files.sh'):
-    """
-    This function generates a bash script that creates directories and
-    symlinks the correct file names for all pointing_groups.
-
-    DO NOT PUT A TRAILING / IN YOUR FILE PATHS.
-    The script adds them in where necessary
-
-    Input
-    ---------
-
-    Pointing_Groups:
-        An array of pointing group pandas tables loaded in from PickledPointings.pkl
-
-    NEO_src : string
-        File path to the folder containing all of the raw instcal files for the
-        Lori Allen dataset
-
-    catalog_src : string
-        File path to the folder containing all of the reference catalogs needed for
-        processing the Lori Allen dataset
-
-    dest : string
-        File path destination. All of the folders will be populated into "dest"
-
-    script_name : string
-        Optional file name of the script
-
-    Output
-    ---------
-
-    none, function will write to a file, named by script_name
-
-    """
-
-    with open(script_name,'w') as link_files:
-        link_files.write('# This file links data in a given field\n')
-        link_files.write('cd '+dest+'\n')
-
-    for i,Pointing in enumerate(Pointing_Groups):
-        if Pointing['stellar_density'][0]>10000.:
-            continue
-
-        ra = str(Pointing['ra'][0])
-        dec = str(Pointing['dec'][0])
-        dir_name = dest+'/Pointing_Group_'+str(i).zfill(3)
-
-        with open(script_name,'a') as link_files:
-            link_files.write('\n# Link files for field: '+dir_name+'\n')
-            link_files.write('mkdir '+dir_name+'\n')
-            link_files.write('mkdir '+dir_name+'/ingest/\n')
-            link_files.write('mkdir '+dir_name+'/ingest/instcal\n')
-            link_files.write('mkdir '+dir_name+'/ingest/dqmask\n')
-            link_files.write('mkdir '+dir_name+'/ingest/wtmap\n')
-            link_files.write('mkdir '+dir_name+'/processed_data\n')
-            link_files.write('echo lsst.obs.decam.DecamMapper > '+dir_name+'/processed_data/_mapper\n')
-            link_files.write('ln -s '+catalog_src+' '+dir_name+'/processed_data/ref_cats\n')
-
-            link_files.write('# Link the images files\n')
-
-        for index,image in Pointing.iterrows():
-            if image['survey_night'] is not 3:
-                with open(script_name,'a') as link_files:
-                    link_files.write('ln -s '+NEO_src+'/night_'+str(image['survey_night']) +
-                      '/night_'+str(image['survey_night'])+'/'+image['filename'].decode('UTF-8') +
-                      ' '+dir_name+'/ingest/instcal/\n')
-            else:
-                with open(script_name,'a') as link_files:
-                    link_files.write('ln -s '+NEO_src+'/night_'+str(image['survey_night']) +
-                      '/night_'+str(image['survey_night'])+'/night_'+str(image['survey_night'])+'/'+image['filename'].decode('UTF-8') +
-                      ' '+dir_name+'/ingest/instcal/\n')
-
-        with open(script_name,'a') as link_files:
-            link_files.write('# Link the dqmask files\n')
-
-        for index,image in Pointing.iterrows():
-            dqmask = image['filename'].decode('UTF-8')[0:20]+'d'+image['filename'].decode('UTF-8')[21:]
-            night = str(image['survey_night'])
-            if image['survey_night'] is not 3:
-                with open(script_name,'a') as link_files:
-                    link_files.write('ln -s '+NEO_src+'/night_'+ night +
-                      '/night_'+night+'/'+dqmask +
-                      ' '+dir_name+'/ingest/dqmask/\n')
-            else:
-                with open(script_name,'a') as link_files:
-                    link_files.write('ln -s '+NEO_src+'/night_'+night +
-                      '/night_'+night+'/night_'+night+'/'+ dqmask +
-                      ' '+dir_name+'/ingest/dqmask/\n')
-
-        with open(script_name,'a') as link_files:
-            link_files.write('# Link the wtmask files\n')
-
-        for index,image in Pointing.iterrows():
-            wtmap = image['filename'].decode('UTF-8')[0:20]+'w'+image['filename'].decode('UTF-8')[21:]
-            night = str(image['survey_night'])
-            if image['survey_night'] is not 3:
-                with open(script_name,'a') as link_files:
-                    link_files.write('ln -s '+NEO_src+'/night_'+ night +
-                      '/night_'+night+'/'+ wtmap +
-                      ' '+dir_name+'/ingest/wtmap/\n')
-            else:
-                with open(script_name,'a') as link_files:
-                    link_files.write('ln -s '+NEO_src+'/night_'+night +
-                      '/night_'+night+'/night_'+night+'/'+ wtmap +
-                      ' '+dir_name+'/ingest/wtmap/\n')
-
-def process_visits(Pointing_Groups,pg_location,pg_lims,script_name='process_visits.sh',
-                   num_cores=20,source_stack=False,setup_loc=''):
-    
-    with open(script_name,'w') as f:
-        
-        if source_stack:
-            f.write('source '+setup_loc+'\n')
-            f.write('setup lsst_distrib\n')
-        
-        f.write('cd '+pg_location+'\n')
-        pg_ids = np.linspace(pg_lims[0],pg_lims[1],pg_lims[1]-pg_lims[0]+1,dtype=int)
-        for i in pg_ids:
-            if Pointing_Groups[i]['stellar_density'][0]>10000:
-                continue
-            min_visit = str(np.min(Pointing_Groups[i]['visit_id']))
-            max_visit = str(np.max(Pointing_Groups[i]['visit_id']))
-            f.write('cd Pointing_Group_'+str(i).zfill(3)+'\n')
-            f.write('ingestImagesDecam.py processed_data --filetype instcal --mode=link ingest/instcal/* >& ingest.log\n')
-            f.write('processCcd.py processed_data/ --rerun rerun_processed_data --id visit='+min_visit+'..'+max_visit+' --longlog -C configProcessCcd_neo.py -j'+str(num_cores)+' >& processCcd.log\n')
-            f.write('cd ..\n')
-        
 def pickle_pointings(Pointing_Groups,filename='PickledPointings.pkl'):
     with open(filename, 'wb') as f:
         pickle.dump(Pointing_Groups, f)

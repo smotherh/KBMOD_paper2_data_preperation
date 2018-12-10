@@ -1,0 +1,43 @@
+#!/bin/bash
+
+## Job Name
+#SBATCH --job-name={jobtype}-{groupid}
+
+## On mox and ikt, the account and partition options should be the same.
+#SBATCH --account=astro
+#SBATCH --partition=astro
+
+## Nodes
+#SBATCH --nodes=1   
+
+## Walltime (3 hours). Do not specify a walltime substantially more than your job needs.
+#SBATCH --time=10:00:00
+
+## Max Number of Nodes
+#SBATCH --qos=MaxJobs5
+
+## Memory per node. It is important to specify the memory since the default memory is very small.
+## For mox, --mem may be more than 100G depending on the memory of your nodes.
+## For ikt, --mem may be 58G or more depending on the memory of your nodes.
+#SBATCH --mem=100G
+
+## Specify the working directory for this job
+## /gscratch/scrubbed/smotherh/pointing_groups/
+#SBATCH --workdir={workdir}
+
+##turn on e-mail notification
+##SBATCH --mail-type=ALL
+##SBATCH --mail-user=smotherh@uw.edu
+
+## export all your environment variables to the batch job session
+#SBATCH --export=all
+
+## is this really required then if we are exportng our env to there and source the stack before starting job?
+source /gscratch/astro/smotherh/lsst_16/loadLSST.bash
+setup lsst_distrib
+
+############################################################################################################
+#########################              CMD SECTION                      ####################################
+############################################################################################################
+
+
