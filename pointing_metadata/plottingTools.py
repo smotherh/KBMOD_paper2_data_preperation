@@ -2,6 +2,7 @@ import numpy as np
 from astropy.io import fits
 import matplotlib.pyplot as plt
 import pandas as pd
+import os
 
 def makeStamps(name,objectList,imagePath,numCols=5):
     """Generate postage stamps of an MPC object in the Lori Allen Dataset.
@@ -45,10 +46,11 @@ def makeStamps(name,objectList,imagePath,numCols=5):
     for i,row in singleObject.iterrows():
         # Get the Lori Allen visit id from the single object list
         visit_id = row['visit_id']
+        ccd = row['ccd']
         # Get the x and y values from the first object in the cut list. Round to an integer.
         objectLoc = np.round([row['x_pixel'],row['y_pixel']])
         # Open up the fits file of interest using the pre-defined filepath string
-        hdul = fits.open(imagePath+str(visit_id)+'.fits')
+        hdul = fits.open(os.path.join(imagePath,'{:02}/{}.fits'.format(ccd,visit_id)))
 
         # Generate the minimum and maximum pixel values for the stamps using stampSize
         xmin = int(objectLoc[0]-(stampSize[0]-1)/2)
