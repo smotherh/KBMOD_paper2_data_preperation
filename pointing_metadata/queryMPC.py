@@ -157,7 +157,7 @@ def runMPCRequests(dataframe, field_label):
             
     return results_df
 
-def matchPixels(objectDF,dataPath,verbose=False):
+def matchSingleVisit(visitDF,visit,dataPath,verbose=False):
     """Match the MPC object RA and DEC to pixel coorinates in the DECam NEO Survey
     Inputs-
         objectDF: Dataframe from runMPCRequests.
@@ -167,37 +167,32 @@ def matchPixels(objectDF,dataPath,verbose=False):
 
     Outputs-
         objectDF: Updated Dataframe with object->pixel relationships.
-    """
-    
-    nightVisits = np.unique(objectDF['visit_id'])
-    for j,visit in enumerate(nightVisits):
-        if verbose:
-            print('Processing visit {}.'.format(visit))
-        df_visit = objectDF.query('visit_id == %i' % visit)
-        for idx, obj_row in df_visit.iterrows():
-            ra = '%i:%i:%.1f' % (obj_row['ra_hour'], obj_row['ra_min'], obj_row['ra_sec'])
-            dec = '%i:%i:%.1f' % (obj_row['dec_deg'], obj_row['dec_min'], obj_row['dec_sec'])
-            c = SkyCoord(ra, dec, frame='icrs', unit=(u.hourangle, u.deg))
+    """    
+    if verbose:
+        print('Processing visit {}.'.format(visit))
+    for idx, obj_row in visitDF.iterrows():
+        ra = '%i:%i:%.1f' % (obj_row['ra_hour'], obj_row['ra_min'], obj_row['ra_sec'])
+        dec = '%i:%i:%.1f' % (obj_row['dec_deg'], obj_row['dec_min'], obj_row['dec_sec'])
+        c = SkyCoord(ra, dec, frame='icrs', unit=(u.hourangle, u.deg))
 
-            for i in range(1, 63):
-                if (i==2 or i==61):
-                    continue
-                if verbose:
-                    print('Processing ccd {} of 62.'.format(i))
-                try:
-                    #print('%s/v%i/diffexp-%02i.fits' % (dataPath, visit, i))
-                    fitsHeader = fits.getheader('%s/%02i/%i.fits' % (dataPath,i, visit),1)
-                    w = WCS(fitsHeader)
-                    x_pix, y_pix = c.to_pixel(w)
-                    if (x_pix < 2010) and (x_pix > 0) and (y_pix < 4100) and (y_pix > 0):
-                        if verbose:
-                            print(obj_row['name'], ra, dec)
-                            print(x_pix, y_pix)
-                        objectDF['x_pixel'].iloc[idx] = x_pix
-                        objectDF['y_pixel'].iloc[idx] = y_pix
-                        objectDF['ccd'].iloc[idx] = i
-                        break
-                except NoConvergence:
-                    continue
-        print('Completed visit {} of {}'.format(j+1,len(nightVisits)))
-    return(objectDF)
+        for i in range(1, 63):
+            if (i==2 or i==61):
+                continue
+            if verbose:
+                print('Processing ccd {} of 62.'.format(i))
+            try:
+                #print('%s/v%i/diffexp-%02i.fits' % (dataPath, visit, i))
+                fitsHeader = fits.getheader('%s/%02i/%i.fits' % (dataPath,i, visit),1)
+                w = WCS(fitsHeader)
+                x_pix, y_pix = c.to_pixel(w)
+                if (x_pix < 2010) and (x_pix > 0) and (y_pix < 4100) and (y_pix > 0):
+                    if verbose:
+                        print(obj_row['name'], ra, dec)
+                        print(x_pix, y_pix)
+                    visitDF['x_pixel'].iloc[idx] = x_pix
+                    visitDF['y_pixel'].iloc[idx] = y_pix
+                    visitDF['ccd'].iloc[idx] = i
+                    break
+            except NoConvergence:
+                continue
+    return(visitDF)
