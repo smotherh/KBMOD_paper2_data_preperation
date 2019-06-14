@@ -42,7 +42,7 @@ def createObsTable(df):
         # Convert observation time and sky coords into a string
         if dec_dms.d != 0:
             name = ("     %07i   %s %s %s.%s %02i %02i %06.3f%+03i %02i %05.2f                     W84\n" %
-                        (df['visit_id'].iloc[idx], date_obs[:4], date_obs[5:7], 
+                        (int(df['visit_id'].iloc[idx]), date_obs[:4], date_obs[5:7], 
                          date_obs[8:10], str(time_obj.mjd)[6:11],
                          ra_hms.h, ra_hms.m, ra_hms.s,
                          dec_dms.d, np.abs(dec_dms.m), np.abs(dec_dms.s)))

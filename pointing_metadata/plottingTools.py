@@ -5,7 +5,7 @@ import pandas as pd
 import os
 
 def makeStamps(name,objectList,imagePath,imagePlane='science',numCols=5,
-               stampSize=[31,31]):
+               stampSize=[31,31],timeFile='/astro/store/epyc/users/smotherh/DECAM_Data_Reduction/loriallen_times.dat'):
     """Generate postage stamps of an MPC object in the Lori Allen Dataset.
     
     INPUT-
@@ -45,7 +45,7 @@ def makeStamps(name,objectList,imagePath,imagePlane='science',numCols=5,
         numRows+=1
     # Add a row if numRows=1. Avoids an error caused by ax being 1D.
     if (numRows==1):
-        numRows+=1/astro/store/epyc/users/smotherh/DECAM_Data_Reduction/loriallen_times.d
+        numRows+=1
     # Generate the subplots, setting the size with figsize
     fig,ax = plt.subplots(nrows=numRows,ncols=numCols,
                           figsize=[3*numCols,3.5*numRows])
@@ -62,7 +62,7 @@ def makeStamps(name,objectList,imagePath,imagePlane='science',numCols=5,
     objectAngle = np.arctan2(dx[1],dx[0])
     dr = np.linalg.norm(dx)
     visitId=np.array(findMotion['visit_id'])
-    visitKey,times=np.loadtxt('/astro/store/epyc/users/smotherh/DECAM_Data_Reduction/loriallen_times.dat',unpack=True)
+    visitKey,times=np.loadtxt(timeFile,unpack=True)
     dt=times[visitKey==visitId[-1]]-times[visitKey==visitId[0]]
     dt=dt[0]
     objectVel = dr/dt
