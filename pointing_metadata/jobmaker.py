@@ -7,7 +7,7 @@ import numpy as np
 #################################           Haydens            ##################################
 #################################           scripts            ##################################
 #################################################################################################
-def link_instcal_files(Pointing_Groups,NEO_src,catalog_src,dest,script_name='link_files.sh'):
+def link_instcal_files(Pointing_Groups,NEO_src,catalog_src,dest,mode='link',script_name='link_files.sh'):
     """
     This function generates a bash script that creates directories and
     symlinks the correct file names for all pointing_groups.
@@ -113,16 +113,22 @@ def link_instcal_files(Pointing_Groups,NEO_src,catalog_src,dest,script_name='lin
                       '/night_'+night+'/night_'+night+'/'+ wtmap +
                       ' '+dir_name+'/ingest/wtmap/\n')
 
-def process_visits(Pointing_Groups,pg_location,pg_lims,script_name='process_visits.sh',
+def process_visits(Pointing_Groups,pg_location,pg_lims,pg_idx_type='limits',script_name='process_visits.sh',
                    num_cores=20,source_stack=False,setup_loc=''):
 
     with open(script_name,'w') as f:
         if source_stack:
             f.write('source '+setup_loc+'\n')
             f.write('setup lsst_distrib\n')
-
         f.write('cd '+pg_location+'\n')
-        pg_ids = np.linspace(pg_lims[0],pg_lims[1],pg_lims[1]-pg_lims[0]+1,dtype=int)
+        if pg_idx_type=='limits':
+            pg_ids = np.linspace(pg_lims[0],pg_lims[1],pg_lims[1]-pg_lims[0]+1,dtype=int)
+        elif pg_idx_type=='index':
+            pg_ids = np.copy(pg_lims)
+        else:
+            print('Invalid pointing group index type.')
+            pg_ids = []
+            return()
         for i in pg_ids:
             if Pointing_Groups[i]['stellar_density'][0]>10000:
                 continue
