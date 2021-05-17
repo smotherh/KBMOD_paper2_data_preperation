@@ -113,7 +113,7 @@ class FindObjects():
             return(obj_row)
         return(obj_row)
     
-    def getKBOList(self, pgNum):
+    def getKBOList(self, pgNum, type_of_object='KBO'):
         with open('PickledPointings.pkl', 'rb') as f:
             PointingGroups = pickle.load(f)
         PointingGroups = PointingGroups[pgNum]
@@ -143,12 +143,15 @@ class FindObjects():
 
         totalRate = np.linalg.norm([RA_rate,DEC_rate],axis=0)
         Type = np.array([classtype[0:3] for classtype in np.array(Results['Type'])])
-        KBOList = Results[Type=='KBO']#['Name','RA','DEC','V','DEC_rate','RA_rate']
+        if type_of_object is not None:
+            KBOList = Results[Type==type_of_object]#['Name','RA','DEC','V','DEC_rate','RA_rate']
+        else:
+            KBOList = Results
         return(PointingGroups, KBOList)
 
 def searchKnownObject(
     singleObject, imagePath,numCols=5, stampSize=[31,31], fileType='DeepDiff',
-    useSeeing=False, doMask=True, doStaticMask=True):
+    useSeeing=False, doMask=False, doStaticMask=True, paperFormat=False):
     
     defaults = {
             'im_filepath':None, 'res_filepath':None, 'time_file':None,
@@ -190,8 +193,14 @@ def searchKnownObject(
         numRows+=1
     numRows+=1
     # Generate the subplots, setting the size with figsize
+    if paperFormat:
+        col_scale = 4
+        row_scale = 4.5
+    else:
+        col_scale = 3.4
+        row_scale = 4.0
     fig,ax = plt.subplots(nrows=numRows,ncols=numCols,
-                          figsize=[3.4*numCols,4.0*numRows])
+                          figsize=[col_scale*numCols,row_scale*numRows])
     try:
         objectMag = np.max(singleObject['V'])
     except:
@@ -257,6 +266,7 @@ def searchKnownObject(
         all_hdul.append(hdul)
         
         mask = hdul[2].data.astype(int)
+
         if not master_mask_initialized:
             master_mask = np.zeros(np.shape(mask))
             master_mask_initialized = True
@@ -264,7 +274,9 @@ def searchKnownObject(
         for key in static_mask_keys:
             static_mask_bits += 2**mask_bits_dict[key]
         master_mask[(mask & static_mask_bits) != 0] += 1
-        
+    imageShape = np.shape(all_hdul[0][1].data)    
+
+
     for i,row in enumerate(singleObject):
         # Get the Lori Allen visit id from the single object list
         mask_counter_dict = {}
@@ -275,6 +287,10 @@ def searchKnownObject(
         # Ensure that the positions are on a line
         xLoc = xi[0] + xVel*(times[i]-times[0])
         yLoc = xi[1] + yVel*(times[i]-times[0])
+        # Skip this stamp if it is too close to the edge
+        if ((xLoc > imageShape[1]-stampSize[0]) or (xLoc < stampSize[0]) or
+            (yLoc > imageShape[0]-stampSize[1]) or (yLoc < stampSize[1])):
+            continue
         objectLoc = np.round([xLoc,yLoc])
         #calexpHeader = fits.getheader(calexpPath)
         #seeing = calexpHeader.get('DIMMSEE') #FWHM in arcsec
@@ -289,7 +305,9 @@ def searchKnownObject(
         ymax = int(objectLoc[1]+(stampSize[1]-1)/2+0.5)
         im_dims = np.shape(hdul[1].data)
         # Plot the stamp
-        stampData = hdul[1].data[ymin:ymax,xmin:xmax]
+        # Must initialize stamp to zero to prevent invalid stamp shapes
+        stampData = np.zeros(stampSize)
+        stampData[:stampSize[0],:stampSize[1]] = hdul[1].data[ymin:ymax,xmin:xmax]
         
         maskData = hdul[2].data[ymin:ymax,xmin:xmax].astype(int)
         masterMaskStamp = master_mask[ymin:ymax,xmin:xmax]
@@ -351,9 +369,15 @@ def searchKnownObject(
                 mask_row += '{}: {}'.format(key, mask_counter_dict[key])
 
             im = ax[axi,axj].imshow(stampData,cmap=plt.cm.bone)
-            ax[axi,axj].set_title(
-                'ccd={} | visit={}\nSNR={:.2f} | FWHM={:.2f}"\n{}'.format(
-                    ccd,visit_id,SNR,seeing,mask_row), fontsize=14)
+            if paperFormat:
+                ax[axi,axj].set_title(
+                    'SNR={:.2f}'.format(SNR), fontsize=18)
+                ax[axi,axj].set_xticks([])
+                ax[axi,axj].set_yticks([])
+            else:
+                ax[axi,axj].set_title(
+                    'ccd={} | visit={}\nSNR={:.2f}\n{}'.format(
+                        ccd,visit_id,SNR,mask_row), fontsize=14)
             ax[axi,axj].axis('on')
             # Compute the axis indexes for the next iteration
             if axj<numCols-1:
@@ -367,30 +391,45 @@ def searchKnownObject(
     coaddStamp = np.median(coaddData,axis=0)
     momLims, peakArray = filterSearch.apply_stamp(coaddStamp)
     im = ax[0,0].imshow(coaddStamp,cmap=plt.cm.bone)
+    ax[0,0].set_xticks([])
+    ax[0,0].set_yticks([])
     SNR = np.sum(psiArray)/np.sqrt(np.sum(phiArray))
     flux = psiArray/phiArray
     x_values = np.linspace(1,len(psiArray),len(psiArray))
-    _=ax[0,0].set_title('Coadd | SNR={:.4f}'.format(SNR), fontsize=14)
+    _=ax[0,0].set_title('Coadd | SNR={:.4f}'.format(SNR), fontsize=18)
     ax[0,1] = plt.subplot2grid((numRows,numCols), (0,1),colspan=4,rowspan=1)
-    ax[0,1].plot(x_values, flux, 'b')
-    ax[0,1].plot(x_values[goodIndex], flux[goodIndex], 'r.', ms=15)
+    ax[0,1].plot(x_values, flux, color='tab:blue')
+    ax[0,1].plot(x_values[goodIndex], flux[goodIndex], marker='.', color='tab:orange', ls='', ms=15)
     ax[0,1].xaxis.set_ticks(x_values)
-    ax[0,1].set_title(
-        ('Filtered SNR = {:.4f}\n'
-        +'Cental Moments: [{:.2f}, {:.2f}, {:.2f}, {:.2f}, {:.2f}], '
-        +'Peak: [{},{}]').format(newLh,*momLims,*peakArray), fontsize=14)
-    ax[0,1].set_xlabel('Visit number', fontsize=14)
-    ax[0,1].set_ylabel('Object flux', fontsize=14)
+    ax[0,1].tick_params(labelsize=18)
+    if paperFormat:
+        ax[0,1].set_title('Filtered SNR = {:.4f}'.format(newLh),fontsize=18)
+    else:
+        ax[0,1].set_title(
+            ('Filtered SNR = {:.4f}\n'
+            +'Cental Moments: [{:.2f}, {:.2f}, {:.2f}, {:.2f}, {:.2f}], '
+            +'Peak: [{},{}]').format(newLh,*momLims,*peakArray), fontsize=14)
+    ax[0,1].set_xlabel('Visit number', fontsize=18)
+    ax[0,1].set_ylabel('Object flux', fontsize=18)
     targetLoc = [findMotion['x_pixel'][0], findMotion['y_pixel'][0]]
     objectData = [singleObject['targetname'][0],objectMag,[xVel,yVel],
                   objectVel,objectAngle,targetLoc]
-    figTitle = ('{} image\nv_mag={}, velocity=[{:.2f},{:.2f}]={:.2f} px/day,'
-                +'angle={:.2f}\npixel=[{:.2f},{:.2f}], residual=[{:.2f},{:.2f}]')
-    fig.suptitle(figTitle.format(
-        singleObject['targetname'][0],objectMag,xVel,yVel,objectVel,
-        objectAngle,*targetLoc,xResidual,yResidual),fontsize=18)
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
-    return(coaddData,objectData,findMotion)
+    if paperFormat:
+        figTitle = ('{}\nV mag={}, Velocity=[{:.2f},{:.2f}]={:.2f} px/day,'
+                    +'\nStarting Pixel=[{:.2f},{:.2f}]')
+        fig.suptitle(figTitle.format(
+            singleObject['targetname'][0],objectMag,xVel,yVel,objectVel,
+            *targetLoc),fontsize=18)
+        fig.tight_layout(rect=[0, 0, 1, 0.94])
+    else:
+        figTitle = ('{} image\nv_mag={}, velocity=[{:.2f},{:.2f}]={:.2f} px/day,'
+                    +'angle={:.2f}\npixel=[{:.2f},{:.2f}], residual=[{:.2f},{:.2f}]')
+        fig.suptitle(figTitle.format(
+            singleObject['targetname'][0],objectMag,xVel,yVel,objectVel,
+            objectAngle,*targetLoc,xResidual,yResidual),fontsize=18)
+    
+        fig.tight_layout(rect=[0, 0, 1, 0.90])
+    return(coaddData,objectData,findMotion,SNR)
 
 def makeStamps(singleObject,imagePath,imagePlane='science',numCols=5,
                stampSize=[31,31],fileType='DeepDiff'):
@@ -532,8 +571,8 @@ def makeStamps(singleObject,imagePath,imagePlane='science',numCols=5,
 
             im = ax[axi,axj].imshow(stampData,cmap=plt.cm.bone)
             ax[axi,axj].set_title(
-                'ccd={} | visit={}\nSNR={:.2f} | FWHM={:.2f}"'.format(
-                    ccd, visit_id, SNR, seeing))
+                'ccd={} | visit={}\nSNR={:.2f}"'.format(
+                    ccd, visit_id, SNR))
             ax[axi,axj].axis('on')
             # Compute the axis indexes for the next iteration
             if axj<numCols-1:
@@ -557,11 +596,13 @@ def makeStamps(singleObject,imagePath,imagePlane='science',numCols=5,
         objectVel, objectAngle, *targetLoc), fontsize=16)
     return(coaddData,objectData)
 
-def getPlots(PointingGroups, pgNum, KBOList, findObjects, fileType='DeepDiff',
-             dataPath='/astro/store/epyc/users/smotherh/DECAM_Data_Reduction/pointing_groups_hyak/Pointing_Group_{0:03}'):
+def getPlots(PointingGroups, pgNum, KBOList, findObjects, fileType='DeepDiff', ccdList=None, LH_lim = 0.,
+             dataPath='/astro/store/epyc/users/smotherh/DECAM_Data_Reduction/pointing_groups_hyak/Pointing_Group_{0:03}',
+             paperFormat=False):
     pgObjectData = {}
     dupObjectNum = 0
     allFindMotion=[]
+    all_obj = {}
     for KBONum,KBO in enumerate(KBOList):
         objectName = KBO['Name']
         df = PointingGroups
@@ -572,8 +613,11 @@ def getPlots(PointingGroups, pgNum, KBOList, findObjects, fileType='DeepDiff',
             allTimes.append(time_obj.jd)
         allTimes = np.array(allTimes)
         times = allTimes
-        obj = Horizons(id=objectName, location='W84', epochs=times) #ccd 43
-        orbits = obj.ephemerides(quantities='1, 9')
+        try:
+            obj = Horizons(id=objectName, location='W84', epochs=times) #ccd 43
+            orbits = obj.ephemerides(quantities='1, 9')
+        except:
+            continue
         orbits['visit'] = [int(visit) for visit in df['visit_id']]
         orbits['x_pixel'] = -99
         orbits['y_pixel'] = -99
@@ -587,11 +631,12 @@ def getPlots(PointingGroups, pgNum, KBOList, findObjects, fileType='DeepDiff',
         findObjects.fileType = fileType
         nightVisits = np.array(orbits['visit'])
 
-        findObjects.testVisit = nightVisits[20]
+        findObjects.testVisit = nightVisits[-1]
         with mp.Pool(20) as pool:
             results = pool.map(findObjects.matchCcds,range(1,63))
-
-        for j in range(62):
+        if ccdList is None:
+            ccdList = np.linspace(0,61,62).astype(int)
+        for j in ccdList:
             foo = results[j]
             onCcd = foo[foo['ccd']>0]
             if len(onCcd)>0:
@@ -606,24 +651,35 @@ def getPlots(PointingGroups, pgNum, KBOList, findObjects, fileType='DeepDiff',
             allResults = vstack(results)
             allResults = allResults[allResults['ccd']>0]
             if (int(allResults[0]['visit'])==int(PointingGroups['visit_id'][0])):
-                coaddData,objectData,findMotion = searchKnownObject(
+                coaddData,objectData,findMotion, SNR = searchKnownObject(
                     allResults, findObjects.dataPath, stampSize=[21,21],
-                    numCols=5, fileType=fileType)
-                pgKey = 'pg{:03}_ccd{:02}'.format(pgNum, findObjects.ccdNum)
-                allFindMotion.append(findMotion)
-                if pgKey not in pgObjectData:
-                    pgObjectData[pgKey] = objectData
+                    numCols=5, fileType=fileType, paperFormat=paperFormat)
+                if SNR > LH_lim:
+                    pgKey = 'pg{:03}_ccd{:02}'.format(pgNum, findObjects.ccdNum)
+                    allFindMotion.append(findMotion)
+                    if pgKey not in pgObjectData:
+                        pgObjectData[pgKey] = objectData
+                    else:
+                        dupObjectNum += 1
+                        pgObjectData[pgKey+'_'+str(dupObjectNum)] = objectData
+                    if paperFormat:
+                        plt.savefig('known_objects/pg{:03}_ccd{:02}_{}.pdf'.format(
+                            pgNum,findObjects.ccdNum,objectName.replace(" ", "_")))
+                    else:
+                        plt.savefig('known_objects/pg{:03}_ccd{:02}_{}'.format(
+                            pgNum,findObjects.ccdNum,objectName.replace(" ", "_")))
+                    
+                    all_obj[objectName] = obj
+                    plt.close()
                 else:
-                    dupObjectNum += 1
-                    pgObjectData[pgKey+'_'+str(dupObjectNum)] = objectData
-                plt.savefig('known_objects/pg{:03}_ccd{:02}_{}'.format(
-                    pgNum,findObjects.ccdNum,objectName.replace(" ", "_")))
-                plt.close()
+                    print('Object {} has a coadded likelihood less than {}'.format(
+                    objectName, LH_lim))
+                    plt.close()
             else:
                 print('Object {} is not present in the first visit'.format(
                     objectName))
         findObjects.ccdNum = None
-    return(pgObjectData, allFindMotion)
+    return(pgObjectData, allFindMotion, all_obj)
 
 class Filter():
     def __init__(self, config):
